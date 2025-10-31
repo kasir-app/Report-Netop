@@ -15,42 +15,42 @@ import {
   query,
   getDocs,
   Timestamp,
-  doc, // <-- Tambahkan
-  updateDoc, // <-- Tambahkan
-  deleteDoc, // <-- Tambahkan
+  doc,
+  updateDoc,
+  deleteDoc,
+  setLogLevel, // Tambahkan untuk logging
 } from 'firebase/firestore';
 import {
   LayoutDashboard,
   Ticket,
-  ClipboardPlus,
-  Wrench,
+  FileInput,
+  HardHat,
   UserCheck,
-  Truck,
-  CalendarCheck,
-  PenTool,
-  Coffee,
-  MoreHorizontal,
+  Users,
+  Calendar,
+  Briefcase,
+  Wrench,
+  Moon,
+  Sun,
+  User,
+  LogOut,
   Menu,
   X,
-  LogOut,
-  User,
   Loader2,
-  Send, // <-- 'Send' akan kita ganti untuk WhatsApp
+  Send,
   Trash2,
   FileDown,
   Search,
   ChevronLeft,
   ChevronRight,
-  Pencil, // <-- Tambahkan
-  MessageSquare, // <-- Tambahkan untuk WhatsApp
+  Pencil,
+  MessageSquare, // Ikon untuk WhatsApp
+  Settings, // <-- TAMBAHKAN BARIS INI
 } from 'lucide-react';
 
 // --- Konfigurasi Firebase & ID Aplikasi ---
-// Variabel ini akan disediakan oleh lingkungan Canvas
-const appId = typeof __app_id !== 'undefined' ? __app_id : 'laporan-ticket';
 
-// --- Fallback Config ---
-// Gunakan config yang diberikan pengguna jika __firebase_config tidak tersedia
+// Salinan konfigurasi yang Anda berikan, sebagai fallback
 const USER_PROVIDED_CONFIG = {
   apiKey: "AIzaSyC_imtiUZVavmtW94b0GbIj40teeK5jFwY",
   authDomain: "laporan-ticket.firebaseapp.com",
@@ -61,7 +61,10 @@ const USER_PROVIDED_CONFIG = {
   measurementId: "G-ME2B3T11ZL"
 };
 
-// Coba dapatkan config dari environment, jika tidak ada (atau kosong), gunakan config dari pengguna
+// Logika untuk mendapatkan App ID dari lingkungan
+const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+
+// Logika untuk mendapatkan konfig Firebase (prioritaskan dari lingkungan)
 const firebaseConfigJSON = (typeof __firebase_config !== 'undefined' && __firebase_config !== '{}')
   ? __firebase_config
   : JSON.stringify(USER_PROVIDED_CONFIG);
@@ -83,7 +86,7 @@ const BRANCH_LIST = [
 ];
 
 // --- Konfigurasi Menu ---
-// Mendefinisikan struktur menu, ikon, dan field untuk form
+// Ini adalah pusat data untuk sidebar dan halaman
 const MENU_ITEMS = [
   {
     name: 'Dashboard',
@@ -101,15 +104,15 @@ const MENU_ITEMS = [
       { name: 'namaBranch', label: 'Nama Branch', type: 'select', options: BRANCH_LIST },
       { name: 'nomerTiket', label: 'Nomer Tiket', type: 'text' },
       { name: 'judul', label: 'Judul Ticket', type: 'text' },
-      { name: 'namaCustomer', label: 'Nama Customer', type: 'text' }, // <-- Tambahkan
-      { name: 'noTelepon', label: 'No. Telepon (WA)', type: 'text' }, // <-- Tambahkan
+      { name: 'namaCustomer', label: 'Nama Customer', type: 'text' },
+      { name: 'noTelepon', label: 'No. Telepon (WA)', type: 'text' },
       { name: 'deskripsi', label: 'Deskripsi Masalah', type: 'textarea' },
       { name: 'status', label: 'Status', type: 'select', options: ['Baru', 'Proses', 'Done'] },
     ],
   },
   {
     name: 'Input Ticket',
-    icon: ClipboardPlus,
+    icon: FileInput,
     page: 'Input Ticket',
     isForm: true,
     collectionName: 'tickets', // Menggunakan koleksi yang sama dengan Laporan
@@ -117,23 +120,22 @@ const MENU_ITEMS = [
       { name: 'namaBranch', label: 'Nama Branch', type: 'select', options: BRANCH_LIST },
       { name: 'nomerTiket', label: 'Nomer Tiket', type: 'text' },
       { name: 'judul', label: 'Judul Ticket', type: 'text' },
-      { name: 'namaCustomer', label: 'Nama Customer', type: 'text' }, // <-- Tambahkan
-      { name: 'noTelepon', label: 'No. Telepon (WA)', type: 'text' }, // <-- Tambahkan
+      { name: 'namaCustomer', label: 'Nama Customer', type: 'text' },
+      { name: 'noTelepon', label: 'No. Telepon (WA)', type: 'text' },
       { name: 'deskripsi', label: 'Deskripsi Masalah', type: 'textarea' },
       { name: 'status', label: 'Status', type: 'select', options: ['Baru', 'Proses', 'Done'] },
     ],
   },
   {
     name: 'Maintenance',
-    icon: Wrench,
+    icon: HardHat,
     page: 'Maintenance',
     isForm: true,
     collectionName: 'maintenance',
     fields: [
-      { name: 'aset', label: 'Nama Aset/Perangkat', type: 'text' },
-      { name: 'jadwal', label: 'Jadwal Maintenance', type: 'date' },
-      { name: 'status', label: 'Status', type: 'select', options: ['Terjadwal', 'Selesai', 'Ditunda'] },
-      { name: 'catatan', label: 'Catatan', type: 'textarea' },
+      { name: 'judul', label: 'Judul Maintenance', type: 'text' },
+      { name: 'lokasi', label: 'Lokasi', type: 'text' },
+      { name: 'deskripsi', label: 'Deskripsi Pekerjaan', type: 'textarea' },
     ],
   },
   {
@@ -144,61 +146,62 @@ const MENU_ITEMS = [
     collectionName: 'konfirmasi',
     fields: [
       { name: 'namaCustomer', label: 'Nama Customer', type: 'text' },
-      { name: 'noTelepon', label: 'No. Telepon (WA)', type: 'text' }, // <-- Tambahkan
+      { name: 'noTelepon', label: 'No. Telepon (WA)', type: 'text' },
       { name: 'ticketId', label: 'ID Ticket Terkait', type: 'text' },
       { name: 'feedback', label: 'Feedback Customer', type: 'textarea' },
     ],
   },
   {
     name: 'Kendala Vendor',
-    icon: Truck,
+    icon: Users,
     page: 'Kendala Vendor',
     isForm: true,
-    collectionName: 'kendalaVendor',
+    collectionName: 'kendala_vendor',
     fields: [
       { name: 'namaVendor', label: 'Nama Vendor', type: 'text' },
-      { name: 'masalah', label: 'Deskripsi Masalah', type: 'textarea' },
-      { name: 'status', label: 'Status', type: 'select', options: ['Dilaporkan', 'Dalam Penanganan', 'Selesai'] },
+      { name: 'kendala', label: 'Deskripsi Kendala', type: 'textarea' },
     ],
   },
   {
     name: 'Absensi',
-    icon: CalendarCheck,
+    icon: Calendar,
     page: 'Absensi',
     isForm: true,
     collectionName: 'absensi',
     fields: [
-      { name: 'status', label: 'Status Kehadiran', type: 'select', options: ['Hadir (WFO)', 'Hadir (WFH)', 'Sakit', 'Izin'] },
-      { name: 'catatan', label: 'Catatan (Opsional)', type: 'text' },
+      { name: 'nama', label: 'Nama Karyawan', type: 'text' },
+      { name: 'status', label: 'Status Kehadiran', type: 'select', options: ['Terlambat', 'Sakit', 'Izin', 'Alpa'] },
+      { name: 'catatan', label: 'Catatan', type: 'textarea' },
     ],
   },
   {
     name: 'Tools',
-    icon: PenTool,
+    icon: Wrench,
     page: 'Tools',
     isForm: true,
     collectionName: 'tools',
     fields: [
       { name: 'namaTools', label: 'Nama Tools', type: 'text' },
-      { name: 'fungsi', label: 'Fungsi', type: 'textarea' },
+      { name: 'kondisi', label: 'Kondisi', type: 'select', options: ['Baik', 'Rusak', 'Hilang'] },
+      { name: 'catatan', label: 'Catatan', type: 'textarea' },
     ],
   },
   {
-    name: 'Cuti',
-    icon: Coffee,
-    page: 'Cuti',
+    name: 'Cuty',
+    icon: Briefcase,
+    page: 'Cuty',
     isForm: true,
-    collectionName: 'cuti',
+    collectionName: 'cuty',
     fields: [
-      { name: 'jenisCuti', label: 'Jenis Cuti', type: 'select', options: ['Tahunan', 'Sakit', 'Melahirkan', 'Penting'] },
+      { name: 'nama', label: 'Nama Karyawan', type: 'text' },
       { name: 'tanggalMulai', label: 'Tanggal Mulai', type: 'date' },
       { name: 'tanggalSelesai', label: 'Tanggal Selesai', type: 'date' },
-      { name: 'alasan', label: 'Alasan', type: 'textarea' },
+      { name: 'alasan', label: 'Alasan Cuti', type: 'textarea' },
     ],
   },
   {
     name: 'Optional',
-    icon: MoreHorizontal,
+    icon: Settings,
     page: 'Optional',
     isForm: true,
     collectionName: 'optional',
@@ -210,25 +213,26 @@ const MENU_ITEMS = [
 ];
 
 // --- Helper Functions ---
+
 /**
- * Mendapatkan path koleksi publik di Firestore.
- * @param {string} collectionName Nama koleksi.
- * @returns {string} Path lengkap ke koleksi.
+ * Mendapatkan path data publik di Firestore.
  */
 const getPublicDataPath = (collectionName) => {
   return `/artifacts/${appId}/public/data/${collectionName}`;
 };
 
 /**
- * Format timestamp Firebase menjadi string yang mudah dibaca.
- * @param {Timestamp} timestamp Objek timestamp Firebase.
- * @returns {string} String tanggal dan waktu.
+ * Memformat objek Timestamp Firebase menjadi string tanggal dan waktu yang mudah dibaca.
  */
 const formatTimestamp = (timestamp) => {
   if (!timestamp) return 'N/A';
-  return new Date(timestamp.seconds * 1000).toLocaleString('id-ID', {
-    dateStyle: 'medium',
-    timeStyle: 'short',
+  const d = timestamp.toDate();
+  return d.toLocaleString('id-ID', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
   });
 };
 
@@ -236,10 +240,10 @@ const formatTimestamp = (timestamp) => {
 
 /**
  * Komponen Dashboard
- * Menampilkan ringkasan statistik dari berbagai koleksi.
+ * Menampilkan ringkasan data.
  */
-function Dashboard({ db, isAuthReady }) {
-  const [stats, setStats] = useState({});
+function Dashboard({ db, isAuthReady, setCurrentPage }) {
+  const [stats, setStats] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -247,59 +251,55 @@ function Dashboard({ db, isAuthReady }) {
 
     const fetchStats = async () => {
       setLoading(true);
-      try {
-        const collectionsToFetch = MENU_ITEMS
-          .filter(item => item.isForm && item.collectionName)
-          .map(item => item.collectionName);
-        
-        const uniqueCollections = [...new Set(collectionsToFetch)];
+      const categories = MENU_ITEMS.filter(item => item.isForm);
+      const statsPromises = categories.map(async (cat) => {
+        try {
+          const path = getPublicDataPath(cat.collectionName);
+          const q = query(collection(db, path));
+          const querySnapshot = await getDocs(q);
+          return {
+            name: cat.name,
+            count: querySnapshot.size,
+            icon: cat.icon,
+          };
+        } catch (error) {
+          console.error(`Error fetching count for ${cat.name}:`, error);
+          return { name: cat.name, count: 0, icon: cat.icon };
+        }
+      });
 
-        const statPromises = uniqueCollections.map(async (collectionName) => {
-          const path = getPublicDataPath(collectionName);
-          const snapshot = await getDocs(query(collection(db, path)));
-          return { [collectionName]: snapshot.size };
-        });
-
-        const results = await Promise.all(statPromises);
-        const combinedStats = results.reduce((acc, current) => ({ ...acc, ...current }), {});
-        setStats(combinedStats);
-      } catch (error) {
-        console.error("Error fetching stats: ", error);
-      } finally {
-        setLoading(false);
-      }
+      const results = await Promise.all(statsPromises);
+      setStats(results);
+      setLoading(false);
     };
 
     fetchStats();
   }, [db, isAuthReady]);
 
-  const StatCard = ({ title, value, icon: Icon }) => (
-    <div className="bg-white rounded-xl shadow-lg p-6 flex items-center space-x-4 transition-all hover:shadow-xl">
-      <div className="p-3 bg-blue-100 text-blue-600 rounded-full">
-        <Icon className="w-6 h-6" />
-      </div>
-      <div>
-        <p className="text-sm font-medium text-gray-500">{title}</p>
-        <p className="text-2xl font-bold text-gray-800">{loading ? '...' : value}</p>
-      </div>
-    </div>
-  );
-
   return (
-    <div className="animate-fade-in">
-      <h1 className="text-3xl font-bold text-gray-800 mb-6">Dashboard</h1>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {MENU_ITEMS
-          .filter(item => item.isForm && item.collectionName)
-          .map(item => (
-            <StatCard
-              key={item.page}
-              title={`Total ${item.name}`}
-              value={stats[item.collectionName] || 0}
-              icon={item.icon}
-            />
+    <div className="animate-fade-in p-6">
+      <h1 className="text-3xl font-bold text-gray-800 mb-8">Dashboard</h1>
+      {loading ? (
+        <div className="flex justify-center items-center h-64">
+          <Loader2 className="w-12 h-12 text-blue-600 animate-spin" />
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          {stats.map(stat => (
+            <button
+              key={stat.name}
+              onClick={() => setCurrentPage(stat.name)}
+              className="bg-white rounded-xl shadow-lg p-6 flex items-center space-x-4 transition-transform transform hover:scale-105 w-full text-left hover:shadow-xl"
+            >
+              <stat.icon className="w-12 h-12 text-blue-500" />
+              <div>
+                <p className="text-sm font-medium text-gray-500">{stat.name}</p>
+                <p className="text-3xl font-bold text-gray-800">{stat.count}</p>
+              </div>
+            </button>
           ))}
-      </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -309,7 +309,7 @@ function Dashboard({ db, isAuthReady }) {
  * Komponen reusable untuk input data dan menampilkan laporan.
  */
 function DataEntryPage({ db, user, isAuthReady, pageConfig }) {
-  const { title, collectionName, fields } = pageConfig;
+  const { name, collectionName, fields } = pageConfig; // <-- FIX 1: Ganti 'title' ke 'name'
   const [formData, setFormData] = useState(() =>
     fields.reduce((acc, field) => ({ ...acc, [field.name]: '' }), {})
   );
@@ -324,22 +324,32 @@ function DataEntryPage({ db, user, isAuthReady, pageConfig }) {
   const [entriesPerPage, setEntriesPerPage] = useState(10); // Default 10 entri
   const [editingItem, setEditingItem] = useState(null); // <-- State untuk mode edit
 
+  // --- FIX 2: Reset form saat halaman berubah ---
+  // Ini untuk memperbaiki bug di mana mode "Edit"
+  // tetap aktif saat pindah ke halaman "Input"
+  useEffect(() => {
+    resetForm();
+  }, [pageConfig]); // <-- Panggil resetForm saat pageConfig berubah
+
   // Listener real-time untuk data laporan
   useEffect(() => {
     if (!db || !isAuthReady || !collectionName) return;
 
     setLoading(true);
     const path = getPublicDataPath(collectionName);
-    const q = query(collection(db, path));
-    
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      // Urutkan berdasarkan createdAt jika ada, dari terbaru
-      data.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+    const q = query(collection(db, path)); // Nanti bisa ditambah order by
+
+    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+      const data = [];
+      querySnapshot.forEach((doc) => {
+        data.push({ id: doc.id, ...doc.data() });
+      });
+      // Urutkan di client-side (terbaru dulu)
+      data.sort((a, b) => b.createdAt?.seconds - a.createdAt?.seconds);
       setReportData(data);
       setLoading(false);
     }, (err) => {
-      console.error("Error listening to collection: ", err);
+      console.error("Error listening to data: ", err);
       setError("Gagal memuat data laporan.");
       setLoading(false);
     });
@@ -356,8 +366,8 @@ function DataEntryPage({ db, user, isAuthReady, pageConfig }) {
       try {
         const start = new Date(startDate).getTime() / 1000;
         // Tambahkan 1 hari ke endDate (dalam detik) untuk mencakup keseluruhan hari itu
-        const end = (new Date(endDate).getTime() / 1000) + 86400; 
-        
+        const end = (new Date(endDate).getTime() / 1000) + 86400;
+
         data = data.filter(item => {
           const itemTime = item.createdAt?.seconds;
           if (!itemTime) return false;
@@ -407,6 +417,7 @@ function DataEntryPage({ db, user, isAuthReady, pageConfig }) {
   const resetForm = () => {
     setFormData(fields.reduce((acc, field) => ({ ...acc, [field.name]: '' }), {}));
     setEditingItem(null);
+    setError('');
   };
 
   const handleSubmit = async (e) => {
@@ -416,28 +427,43 @@ function DataEntryPage({ db, user, isAuthReady, pageConfig }) {
       return;
     }
 
+    // Validasi sederhana
+    for (const field of fields) {
+      // Hanya validasi field yang bukan textarea
+      if (!formData[field.name] && field.type !== 'textarea') {
+        setError(`Field "${field.label}" tidak boleh kosong.`);
+        return;
+      }
+    }
+
     setSubmitting(true);
     setError('');
     
     try {
       const path = getPublicDataPath(collectionName);
+      const dataToSave = {
+        ...formData,
+        updatedAt: Timestamp.now(),
+        updatedBy: user.email || user.uid,
+      };
 
       if (editingItem) {
         // --- LOGIKA UPDATE (EDIT) ---
         const docRef = doc(db, path, editingItem.id);
-        await updateDoc(docRef, {
-          ...formData,
-          updatedAt: Timestamp.now(),
-          updatedBy: user.email || user.uid,
-        });
+        // Hapus info 'created' agar tidak ter-overwrite
+        delete dataToSave.createdAt;
+        delete dataToSave.createdBy;
+        await updateDoc(docRef, dataToSave);
 
       } else {
         // --- LOGIKA CREATE (BARU) ---
-        await addDoc(collection(db, path), {
-          ...formData,
-          createdAt: Timestamp.now(),
-          createdBy: user.email || user.uid,
-        });
+        dataToSave.createdAt = Timestamp.now();
+        dataToSave.createdBy = user.email || user.uid;
+        // Hapus info 'updated'
+        delete dataToSave.updatedAt;
+        delete dataToSave.updatedBy;
+        
+        const docRef = await addDoc(collection(db, path), dataToSave);
 
         // --- TRIGGER: Otomatis masuk ke Konfirm Customer ---
         if (collectionName === 'tickets' && formData.status === 'Done') {
@@ -447,7 +473,7 @@ function DataEntryPage({ db, user, isAuthReady, pageConfig }) {
             noTelepon: formData.noTelepon || '',
             ticketId: formData.nomerTiket || '',
             feedback: '', // Feedback awal kosong
-            originalTicketId: formData.id || '', // Referensi (opsional)
+            originalTicketId: docRef.id, // Referensi
             createdAt: Timestamp.now(),
             createdBy: 'Sistem (Otomatis)',
           });
@@ -467,13 +493,18 @@ function DataEntryPage({ db, user, isAuthReady, pageConfig }) {
 
   const handleEdit = (item) => {
     setEditingItem(item);
-    setFormData(item);
+    // Isi form hanya dengan data yang relevan dengan 'fields'
+    const formDataForEdit = fields.reduce((acc, field) => {
+      acc[field.name] = item[field.name] || '';
+      return acc;
+    }, {});
+    setFormData(formDataForEdit);
     window.scrollTo(0, 0); // Scroll ke atas ke form
+    setError(''); // Hapus error
   };
 
   const handleDelete = async (docId) => {
-    // Gunakan konfirmasi kustom, bukan window.confirm
-    // Untuk saat ini, kita hapus langsung.
+    // Di aplikasi nyata, gunakan modal konfirmasi
     // if (!window.confirm("Apakah Anda yakin ingin menghapus data ini?")) return;
     
     if (!db || !collectionName || !docId) return;
@@ -488,15 +519,23 @@ function DataEntryPage({ db, user, isAuthReady, pageConfig }) {
   };
 
   const handleWhatsApp = (item) => {
-    const phone = item.noTelepon?.replace(/[^0-9]/g, '');
+    let phone = item.noTelepon || '';
+    if (phone.startsWith('0')) {
+      phone = '62' + phone.substring(1); // Ganti 08... jadi 628...
+    }
+    phone = phone.replace(/[^0-9]/g, ''); // Hapus spasi atau -
+
     if (!phone) {
       setError("No. Telepon customer tidak valid atau kosong.");
       return;
     }
     
-    // Pesan default
+    // Pesan default - Dibuat lebih umum
+    const ticketRef = item.nomerTiket || item.ticketId || '[ID Tiket]';
+    const customerName = item.namaCustomer || '[Customer]';
+
     const message = encodeURIComponent(
-      `Halo Bpk/Ibu ${item.namaCustomer},\n\nKami ingin mengkonfirmasi penyelesaian untuk tiket ${item.ticketId}. Apakah kendala sudah terselesaikan dengan baik?\n\nMohon berikan feedback Anda.\nTerima kasih.`
+      `Halo Bpk/Ibu ${customerName},\n\nIni adalah pesan terkait tiket ${ticketRef}.\n\n(Mohon lanjutkan pesan Anda di sini...)\n\nTerima kasih.`
     );
     
     const waUrl = `https://wa.me/${phone}?text=${message}`;
@@ -506,7 +545,6 @@ function DataEntryPage({ db, user, isAuthReady, pageConfig }) {
   // Fungsi untuk download CSV
   const handleDownloadCSV = () => {
     if (filteredData.length === 0) {
-      // Ganti alert dengan UI yang lebih baik jika ada waktu
       console.warn("Tidak ada data untuk di-download.");
       return;
     }
@@ -523,9 +561,8 @@ function DataEntryPage({ db, user, isAuthReady, pageConfig }) {
     // Buat baris data
     filteredData.forEach(item => {
       const row = fields.map(field => {
-        // Ambil nilai, pastikan string, dan handle koma/quotes di dalam data
-        const value = String(item[field.name] || '-').replace(/"/g, '""'); // Ganti double quotes
-        return `"${value}"`; // Bungkus semua nilai dengan double quotes
+        const value = String(item[field.name] || '-').replace(/"/g, '""');
+        return `"${value}"`;
       });
       
       row.push(`"${item.createdBy?.split('@')[0] || item.createdBy}"`);
@@ -540,7 +577,7 @@ function DataEntryPage({ db, user, isAuthReady, pageConfig }) {
     const url = URL.createObjectURL(blob);
     
     link.setAttribute('href', url);
-    const filename = `Laporan_${title.replace(/ /g, '_')}_${new Date().toISOString().split('T')[0]}.csv`;
+    const filename = `Laporan_${name.replace(/ /g, '_')}_${new Date().toISOString().split('T')[0]}.csv`; // <-- FIX 1: Ganti 'title' ke 'name'
     link.setAttribute('download', filename);
     link.style.visibility = 'hidden';
     
@@ -555,34 +592,44 @@ function DataEntryPage({ db, user, isAuthReady, pageConfig }) {
     const commonProps = {
       id: field.name,
       name: field.name,
-      value: formData[field.name],
+      value: formData[field.name] || '',
       onChange: handleChange,
-      className: "mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm",
-      disabled: submitting,
+      className: "mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm py-3",
     };
 
     switch (field.type) {
       case 'textarea':
-        return <textarea {...commonProps} rows={10} />; // Diubah dari 6 menjadi 10
+        return <textarea {...commonProps} rows={10} />; // Dibuat 10 baris
       case 'select':
         return (
           <select {...commonProps}>
             <option value="">Pilih {field.label}</option>
-            {field.options.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+            {field.options.map(opt => (
+              <option key={opt} value={opt}>{opt}</option>
+            ))}
           </select>
         );
       case 'date':
         return <input type="date" {...commonProps} />;
-      default: // 'text'
+      default: // text
         return <input type="text" {...commonProps} />;
     }
   };
 
   return (
-    <div className="animate-fade-in space-y-8">
+    <div className="animate-fade-in space-y-8 p-4 md:p-6">
       {/* Bagian Input Data */}
       <div className="bg-white rounded-xl shadow-lg p-6">
-        <h2 className="text-2xl font-semibold text-gray-800 mb-6">{title}</h2>
+        <h2 className="text-2xl font-semibold text-gray-800 mb-6">
+          {editingItem ? `Edit Data: ${name}` : name} 
+        </h2> 
+        
+        {error && (
+          <div className="mb-4 rounded-md bg-red-50 p-4">
+            <p className="text-sm font-medium text-red-700">{error}</p>
+          </div>
+        )}
+
         <form onSubmit={handleSubmit} className="space-y-4">
           {fields.map(field => (
             <div key={field.name}>
@@ -592,8 +639,7 @@ function DataEntryPage({ db, user, isAuthReady, pageConfig }) {
               {renderField(field)}
             </div>
           ))}
-          {error && <p className="text-sm text-red-600">{error}</p>}
-          <div className="flex justify-end items-center space-x-3">
+          <div className="flex justify-end items-center space-x-3 pt-4">
             {editingItem && (
               <button
                 type="button"
@@ -608,7 +654,7 @@ function DataEntryPage({ db, user, isAuthReady, pageConfig }) {
               disabled={submitting}
               className="inline-flex items-center justify-center rounded-md border border-transparent bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:bg-gray-300"
             >
-              {submitting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : (editingItem ? <Pencil className="w-4 h-4 mr-2" /> : <Send className="w-4 h-cmr-2" />)}
+              {submitting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : (editingItem ? <Pencil className="w-4 h-4 mr-2" /> : <Send className="w-4 h-4 mr-2" />)}
               {editingItem ? 'Update Data' : 'Simpan Data'}
             </button>
           </div>
@@ -618,7 +664,7 @@ function DataEntryPage({ db, user, isAuthReady, pageConfig }) {
       {/* Bagian Laporan */}
       <div className="bg-white rounded-xl shadow-lg p-6">
         <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
-          <h2 className="text-2xl font-semibold text-gray-800">Laporan {title}</h2>
+          <h2 className="text-2xl font-semibold text-gray-800">Laporan {name}</h2> 
           <button
             onClick={handleDownloadCSV}
             className="inline-flex items-center justify-center rounded-md border border-transparent bg-green-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 w-full md:w-auto"
@@ -684,21 +730,20 @@ function DataEntryPage({ db, user, isAuthReady, pageConfig }) {
               <thead className="bg-gray-50">
                 <tr>
                   {fields.map(field => (
-                    <th key={field.name} scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th key={field.name} scope="col" className="px-6 py-3 text-left text-sm font-medium text-gray-500 uppercase tracking-wider">
                       {field.label}
                     </th>
                   ))}
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th scope="col" className="px-6 py-3 text-left text-sm font-medium text-gray-500 uppercase tracking-wider">
                     Dibuat Oleh
                   </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th scope="col" className="px-6 py-3 text-left text-sm font-medium text-gray-500 uppercase tracking-wider">
                     Waktu Input
                   </th>
-                  {collectionName === 'konfirmasi' && (
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Aksi
-                    </th>
-                  )}
+                  {/* --- Kolom Aksi (Berlaku untuk SEMUA) --- */}
+                  <th scope="col" className="px-6 py-3 text-left text-sm font-medium text-gray-500 uppercase tracking-wider">
+                    Aksi
+                  </th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
@@ -716,10 +761,11 @@ function DataEntryPage({ db, user, isAuthReady, pageConfig }) {
                       {formatTimestamp(item.createdAt)}
                     </td>
                     
-                    {/* --- Kolom Aksi Khusus Konfirm Customer --- */}
-                    {collectionName === 'konfirmasi' && (
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        <div className="flex items-center space-x-3">
+                    {/* --- Tombol Aksi (Berlaku untuk SEMUA) --- */}
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                      <div className="flex items-center space-x-3">
+                        {/* Tampilkan tombol WA HANYA jika ada field noTelepon */}
+                        {(item.noTelepon) && (
                           <button
                             onClick={() => handleWhatsApp(item)}
                             className="text-green-600 hover:text-green-800"
@@ -727,23 +773,23 @@ function DataEntryPage({ db, user, isAuthReady, pageConfig }) {
                           >
                             <MessageSquare className="w-5 h-5" />
                           </button>
-                          <button
-                            onClick={() => handleEdit(item)}
-                            className="text-blue-600 hover:text-blue-800"
-                            title="Edit"
-                          >
-                            <Pencil className="w-5 h-5" />
-                          </button>
-                          <button
-                            onClick={() => handleDelete(item.id)}
-                            className="text-red-600 hover:text-red-800"
-                            title="Delete"
-                          >
-                            <Trash2 className="w-5 h-5" />
-                          </button>
-                        </div>
-                      </td>
-                    )}
+                        )}
+                        <button
+                          onClick={() => handleEdit(item)}
+                          className="text-blue-600 hover:text-blue-800"
+                          title="Edit"
+                        >
+                          <Pencil className="w-5 h-5" />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(item.id)}
+                          className="text-red-600 hover:text-red-800"
+                          title="Delete"
+                        >
+                          <Trash2 className="w-5 h-5" />
+                        </button>
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -752,7 +798,7 @@ function DataEntryPage({ db, user, isAuthReady, pageConfig }) {
         </div>
 
         {/* --- Pagination Controls --- */}
-        <div className="flex flex-col md:flex-row items-center justify-between px-4 py-3 bg-white border-t border-gray-200 sm:px-6 rounded-b-xl shadow-lg mt-0">
+        <div className="flex flex-col md:flex-row items-center justify-between px-4 py-3 bg-white border-t border-gray-200 sm:px-6 rounded-b-xl mt-0">
           <div className="flex-1 flex justify-between sm:hidden">
              {/* Mobile buttons - simple */}
             <button
@@ -833,222 +879,182 @@ function DataEntryPage({ db, user, isAuthReady, pageConfig }) {
 
 /**
  * Komponen Sidebar
- * Menampilkan menu navigasi dan info pengguna.
+ * Navigasi utama aplikasi.
  */
 function Sidebar({ currentPage, setCurrentPage, user, onLogout, isOpen, onClose }) {
-  const MenuButton = ({ item }) => {
-    const isActive = currentPage === item.page;
-    const Icon = item.icon;
-    return (
-      <button
-        onClick={() => {
-          setCurrentPage(item.page);
-          onClose(); // Tutup sidebar di mobile saat item diklik
-        }}
-        className={`
-          flex items-center w-full px-4 py-3 rounded-lg transition-all duration-200
-          ${isActive
-            ? 'bg-white text-blue-600 shadow-md'
-            : 'text-white hover:bg-white/20'
-          }
-        `}
-      >
-        <Icon className="w-5 h-5 mr-3" />
-        <span className="font-medium text-sm">{item.name}</span>
-      </button>
-    );
+  const [isDarkTheme, setIsDarkTheme] = useState(false); // Nanti bisa dikembangkan
+
+  const handleThemeToggle = () => {
+    setIsDarkTheme(!isDarkTheme);
+    // Logika ganti tema
   };
 
   return (
     <>
-      {/* Mobile Backdrop */}
+      {/* Overlay untuk mobile */}
       <div
-        className={`fixed inset-0 bg-black/50 z-30 md:hidden ${isOpen ? 'block' : 'hidden'}`}
+        className={`fixed inset-0 z-20 bg-black bg-opacity-50 transition-opacity lg:hidden ${isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
         onClick={onClose}
-      ></div>
-
-      {/* Sidebar Content */}
-      <nav className={`
-        fixed inset-y-0 left-0 z-40 w-64
-        bg-gradient-to-b from-blue-500 to-blue-600 text-white
-        flex flex-col p-4 space-y-2
-        transition-transform duration-300 ease-in-out md:translate-x-0
-        ${isOpen ? 'translate-x-0' : '-translate-x-full'}
-      `}>
-        <div className="flex items-center justify-between md:justify-center mb-6">
-          <h1 className="text-2xl font-bold text-white text-center">Laporan App</h1>
-          <button onClick={onClose} className="md:hidden text-white p-1">
+      />
+      {/* Konten Sidebar */}
+      <div
+        className={`fixed z-30 inset-y-0 left-0 w-64 bg-gradient-to-b from-blue-700 to-blue-900 text-white flex flex-col transform transition-transform duration-300 ease-in-out ${isOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0 lg:static lg:inset-0`}
+      >
+        {/* Header Sidebar */}
+        <div className="flex items-center justify-between p-4 h-16 shadow-lg">
+          <h1 className="text-xl font-bold">Laporan App</h1>
+          <button onClick={onClose} className="lg:hidden text-white hover:text-blue-200">
             <X className="w-6 h-6" />
           </button>
         </div>
-        
-        <div className="flex-1 overflow-y-auto space-y-2 pr-2">
-          {MENU_ITEMS.map(item => (
-            <MenuButton key={item.page} item={item} />
-          ))}
-        </div>
 
-        {/* User Info & Logout */}
-        <div className="pt-4 border-t border-white/20">
-          <div className="flex items-center p-2 rounded-lg bg-white/10 mb-2">
-            <div className="p-2 bg-white text-blue-600 rounded-full">
-               <User className="w-5 h-5" />
+        {/* Menu Navigasi */}
+        <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
+          {MENU_ITEMS.map(item => (
+            <button
+              key={item.name}
+              onClick={() => {
+                setCurrentPage(item.page);
+                onClose(); // Tutup sidebar di mobile setelah klik
+              }}
+              className={`w-full flex items-center space-x-3 px-3 py-2 rounded-lg transition-colors duration-200 ${
+                currentPage === item.page
+                  ? 'bg-blue-900 bg-opacity-50 text-white'
+                  : 'text-blue-100 hover:bg-blue-800 hover:text-white'
+              }`}
+            >
+              <item.icon className="w-5 h-5" />
+              <span className="font-medium">{item.name}</span>
+            </button>
+          ))}
+        </nav>
+
+        {/* Footer Sidebar */}
+        <div className="p-4 border-t border-blue-600">
+          {/* Info User */}
+          <div className="flex items-center space-x-3 mb-4">
+            <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center">
+              <User className="w-6 h-6" />
             </div>
-            <div className="ml-3 overflow-hidden">
-              <p className="text-sm font-medium text-white truncate">
-                {user?.email || user?.uid}
+            <div>
+              <p className="text-sm font-medium">
+                {user ? (user.email ? user.email.split('@')[0] : 'Guest') : 'Loading...'}
               </p>
-              <p className="text-xs text-white/70">Online</p>
+              <p className="text-sm text-blue-200">
+                {user ? (user.isAnonymous ? 'Anonymous' : 'Online') : '...'}
+              </p>
             </div>
           </div>
+          {/* Tombol Logout */}
           <button
             onClick={onLogout}
-            className="flex items-center justify-center w-full px-4 py-2 rounded-lg text-sm font-medium text-white bg-red-500 hover:bg-red-600 transition-all"
+            className="w-full flex items-center justify-center space-x-2 px-3 py-2 rounded-lg bg-red-600 text-white font-medium hover:bg-red-700 transition-colors duration-200"
           >
-            <LogOut className="w-4 h-4 mr-2" />
-            Logout
+            <LogOut className="w-5 h-5" />
+            <span>Logout</span>
           </button>
         </div>
-      </nav>
+      </div>
     </>
   );
 }
 
 /**
  * Komponen Aplikasi Utama
- * Mengelola state global, autentikasi, dan routing halaman.
+ * Mengelola state global, auth, dan layout.
  */
 export default function App() {
-  const [db, setDb] = useState(null);
-  const [auth, setAuth] = useState(null);
-  const [user, setUser] = useState(null);
-  const [isAuthReady, setIsAuthReady] = useState(false);
   const [currentPage, setCurrentPage] = useState('Dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [error, setError] = useState('');
+  
+  // State untuk Firebase
+  const [app, setApp] = useState(null);
+  const [auth, setAuth] = useState(null);
+  const [db, setDb] = useState(null);
+  
+  // State untuk User
+  const [user, setUser] = useState(null);
+  const [isAuthReady, setIsAuthReady] = useState(false); // Status kesiapan auth
 
-  // Inisialisasi Firebase dan Autentikasi
+  // 1. Inisialisasi Firebase
   useEffect(() => {
     try {
       const config = JSON.parse(firebaseConfigJSON);
-      if (!config.apiKey) {
-        setError("Konfigurasi Firebase tidak valid. Memuat fallback.");
-        // Coba lagi dengan config yang di-hardcode
-        const fallbackConfig = JSON.parse(JSON.stringify(USER_PROVIDED_CONFIG));
-        const app = initializeApp(fallbackConfig);
-        const authInstance = getAuth(app);
-        const dbInstance = getFirestore(app);
-        setAuth(authInstance);
-        setDb(dbInstance);
-      } else {
-        const app = initializeApp(config);
-        const authInstance = getAuth(app);
-        const dbInstance = getFirestore(app);
-        setAuth(authInstance);
-        setDb(dbInstance);
-      }
+      const firebaseApp = initializeApp(config);
+      const firestoreDb = getFirestore(firebaseApp);
+      const firebaseAuth = getAuth(firebaseApp);
       
-      // Setelah auth diset (dari try atau catch)
-      const authInstance = getAuth(); // Ambil instance yg sudah diset
-      const unsubscribe = onAuthStateChanged(authInstance, async (user) => {
-        if (user) {
-          setUser(user);
-          setIsAuthReady(true);
-        } else {
-          // Jika user logout atau token tidak ada, coba login
-          try {
-            if (typeof __initial_auth_token !== 'undefined') {
-              await signInWithCustomToken(authInstance, __initial_auth_token);
-            } else {
-              await signInAnonymously(authInstance);
-            }
-          } catch (authError) {
-            console.error("Gagal melakukan autentikasi:", authError);
-            setError("Gagal terhubung ke layanan autentikasi.");
-            setIsAuthReady(true); // Tetap set ready agar error bisa ditampilkan
-          }
-        }
-      });
+      setApp(firebaseApp);
+      setDb(firestoreDb);
+      setAuth(firebaseAuth);
 
-      return () => unsubscribe();
+      // Aktifkan logging Firebase (membantu debug)
+      setLogLevel('debug');
 
     } catch (e) {
-      console.error("Error inisialisasi Firebase:", e);
-      setError("Gagal memuat konfigurasi aplikasi. Pastikan __firebase_config valid.");
-      setIsAuthReady(true);
+      console.error("Error initializing Firebase:", e);
     }
-  }, []); // Jalankan sekali saat mount
+  }, []); // Hanya jalan sekali
 
-  const handleLogout = async () => {
+  // 2. Autentikasi User
+  useEffect(() => {
+    if (!auth) return;
+
+    const signInUser = async () => {
+      try {
+        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+          console.log("Signing in with custom token...");
+          await signInWithCustomToken(auth, __initial_auth_token);
+        } else {
+          console.log("Signing in anonymously...");
+          await signInAnonymously(auth);
+        }
+      } catch (error) {
+        console.error("Firebase Auth Error:", error);
+      }
+    };
+
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+      setIsAuthReady(true);
+      if (currentUser) {
+        console.log("User signed in:", currentUser.uid);
+      } else {
+        console.log("User signed out.");
+        // Coba sign-in lagi jika tidak ada user
+        if (!isAuthReady) {
+           signInUser();
+        }
+      }
+    });
+
+    // Sign in saat auth siap
+    signInUser();
+
+    return () => unsubscribe();
+  }, [auth]); // Jalan saat auth siap
+
+  // Fungsi Logout
+  const handleLogout = () => {
     if (auth) {
-      await signOut(auth);
-      // onAuthStateChanged akan otomatis menangani login ulang
+      signOut(auth).catch((error) => console.error('Logout error:', error));
     }
   };
 
-  // Render halaman saat ini
-  const CurrentPage = useMemo(() => {
-    if (!isAuthReady || !db || !user) {
-      return null; // Akan ditangani oleh loading state
+  // Render konten halaman berdasarkan state
+  const renderPage = () => {
+    const pageConfig = MENU_ITEMS.find(item => item.page === currentPage);
+    if (!pageConfig) return <Dashboard db={db} isAuthReady={isAuthReady} setCurrentPage={setCurrentPage} />;
+
+    if (pageConfig.isForm) {
+      return <DataEntryPage db={db} user={user} isAuthReady={isAuthReady} pageConfig={pageConfig} />;
+    } else {
+      return <Dashboard db={db} isAuthReady={isAuthReady} setCurrentPage={setCurrentPage} />;
     }
+  };
 
-    if (currentPage === 'Dashboard') {
-      return <Dashboard db={db} isAuthReady={isAuthReady} />;
-    }
-
-    const pageConfig = MENU_ITEMS.find(item => item.page === currentPage && item.isForm);
-    if (pageConfig) {
-      return <DataEntryPage db={db} user={user} isAuthReady={isAuthReady} pageConfig={{ ...pageConfig, title: pageConfig.name }} />;
-    }
-
-    return <h1 className="text-xl">Halaman tidak ditemukan.</h1>;
-  }, [currentPage, db, user, isAuthReady]);
-
-  // Loading atau Error state
-  if (!isAuthReady) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-100">
-        <Loader2 className="w-12 h-12 text-blue-600 animate-spin" />
-        <p className="ml-4 text-lg text-gray-700">Memuat Aplikasi...</p>
-      </div>
-    );
-  }
-  
-  if (error && !user) { // Hanya tampilkan error fatal jika user tidak bisa login
-     return (
-      <div className="flex items-center justify-center min-h-screen bg-red-100 p-4">
-        <p className="text-lg text-red-700 text-center">Error: {error}</p>
-      </div>
-    );
-  }
-
-  // Render layout utama
   return (
-    <div className="flex h-screen bg-gray-100 font-sans">
-      <style>{`
-        @keyframes fade-in {
-          from { opacity: 0; transform: translateY(10px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        .animate-fade-in { animation: fade-in 0.3s ease-out; }
-        
-        /* Custom scrollbar */
-        ::-webkit-scrollbar {
-          width: 6px;
-          height: 6px;
-        }
-        ::-webkit-scrollbar-thumb {
-          background: #cbd5e1;
-          border-radius: 3px;
-        }
-        ::-webkit-scrollbar-thumb:hover {
-          background: #94a3b8;
-        }
-        ::-webkit-scrollbar-track {
-          background: #f1f5f9;
-        }
-      `}</style>
-
+    <div className="flex h-screen bg-gray-100">
       <Sidebar
         currentPage={currentPage}
         setCurrentPage={setCurrentPage}
@@ -1057,24 +1063,36 @@ export default function App() {
         isOpen={isSidebarOpen}
         onClose={() => setIsSidebarOpen(false)}
       />
-
-      <main className="flex-1 flex flex-col md:pl-64">
-        {/* Header Mobile */}
-        <header className="md:hidden bg-white shadow-sm sticky top-0 z-20">
-          <div className="flex items-center justify-between px-4 py-3">
-            <button onClick={() => setIsSidebarOpen(true)} className="text-gray-700 p-2">
-              <Menu className="w-6 h-6" />
-            </button>
-            <h1 className="text-lg font-semibold text-gray-800">{currentPage}</h1>
-            <div className="w-8"></div> {/* Spacer */}
+      <div className="flex-1 flex flex-col overflow-hidden">
+        {/* Header Utama (Konten) */}
+        <header className="bg-white shadow-md h-16 flex items-center justify-between px-6 lg:justify-end">
+          {/* Tombol Menu Mobile */}
+          <button
+            onClick={() => setIsSidebarOpen(true)}
+            className="text-gray-600 hover:text-gray-900 lg:hidden"
+          >
+            <Menu className="w-6 h-6" />
+          </button>
+          
+          {/* Placeholder untuk ikon di header jika perlu */}
+          <div className="flex items-center space-x-4">
+             {/* <button className="text-gray-600 hover:text-gray-900">
+               <Sun className="w-6 h-6" />
+             </button> */}
           </div>
         </header>
-
+        
         {/* Konten Utama */}
-        <div className="flex-1 p-6 md:p-10 overflow-y-auto">
-          {CurrentPage}
-        </div>
-      </main>
+        <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-100">
+          {isAuthReady ? (
+            renderPage()
+          ) : (
+            <div className="w-full h-full flex justify-center items-center">
+              <Loader2 className="w-16 h-16 text-blue-600 animate-spin" />
+            </div>
+          )}
+        </main>
+      </div>
     </div>
   );
 }
